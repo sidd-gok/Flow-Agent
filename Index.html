@@ -1,0 +1,2267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Modha Flow — AI Swimlane Generator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f1117;
+      --panel:     #1a1d27;
+      --border:    #2a2d3a;
+      --accent:    #5b6af9;
+      --accent-h:  #7b8aff;
+      --success:   #3ecf8e;
+      --warn:      #f0b429;
+      --danger:    #e8534a;
+      --text:      #e8eaf0;
+      --muted:     #6b7280;
+      --input-bg:  #12151e;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      height: 52px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-icon {
+      width: 30px; height: 30px;
+      background: linear-gradient(135deg, var(--accent), #a78bfa);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+    .logo h1 { font-size: 16px; font-weight: 700; letter-spacing: 0.3px; }
+    .logo span { color: var(--accent); }
+
+    .header-actions { display: flex; align-items: center; gap: 8px; }
+
+    .badge {
+      font-size: 11px; font-weight: 600; padding: 3px 8px;
+      border-radius: 20px; letter-spacing: 0.5px;
+    }
+    .badge-beta { background: #1e2a4a; color: var(--accent-h); border: 1px solid var(--accent); }
+
+    /* ── Layout ── */
+    .workspace {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Left Panel ── */
+    .sidebar {
+      width: 340px;
+      flex-shrink: 0;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .section {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-title {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 1px; color: var(--muted); margin-bottom: 12px;
+    }
+
+    label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; margin-top: 10px; }
+    label:first-child { margin-top: 0; }
+
+    input[type="text"], input[type="password"], textarea, select {
+      width: 100%;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 13px;
+      padding: 8px 10px;
+      outline: none;
+      transition: border-color 0.15s;
+      font-family: inherit;
+    }
+    input[type="text"]:focus,
+    input[type="password"]:focus,
+    textarea:focus,
+    select:focus { border-color: var(--accent); }
+
+    textarea { resize: vertical; min-height: 110px; line-height: 1.5; }
+
+    select option { background: var(--panel); }
+
+    /* ── Toggle row ── */
+    .toggle-row {
+      display: flex; gap: 6px;
+    }
+    .toggle-btn {
+      flex: 1; padding: 7px 0;
+      border-radius: 6px; border: 1px solid var(--border);
+      background: var(--input-bg); color: var(--muted);
+      font-size: 12px; font-weight: 600; cursor: pointer;
+      transition: all 0.15s;
+      letter-spacing: 0.3px;
+    }
+    .toggle-btn:hover { border-color: var(--accent); color: var(--text); }
+    .toggle-btn.active {
+      background: var(--accent); border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* ── Image upload ── */
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.15s;
+      background: var(--input-bg);
+      position: relative;
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: var(--accent);
+      background: #1a1d27;
+    }
+    .upload-zone input[type="file"] {
+      position: absolute; inset: 0;
+      opacity: 0; cursor: pointer;
+      width: 100%; height: 100%;
+      padding: 0;
+      border: none;
+    }
+    .upload-icon { font-size: 24px; margin-bottom: 6px; }
+    .upload-text { font-size: 12px; color: var(--muted); }
+    .upload-text strong { color: var(--accent); }
+    #img-preview {
+      max-width: 100%; max-height: 120px;
+      border-radius: 6px; margin-top: 8px;
+      display: none;
+    }
+
+    /* ── API key field ── */
+    .api-key-wrap { position: relative; }
+    .api-key-wrap input { padding-right: 36px; }
+    .key-toggle {
+      position: absolute; right: 8px; top: 50%;
+      transform: translateY(-50%);
+      background: none; border: none;
+      color: var(--muted); cursor: pointer;
+      font-size: 14px; padding: 2px;
+    }
+    .key-toggle:hover { color: var(--text); }
+
+    /* ── Buttons ── */
+    .btn {
+      display: flex; align-items: center; justify-content: center;
+      gap: 7px; width: 100%; padding: 10px 16px;
+      border-radius: 8px; border: none; cursor: pointer;
+      font-size: 13px; font-weight: 600; transition: all 0.15s;
+      font-family: inherit;
+    }
+    .btn-primary {
+      background: var(--accent); color: #fff;
+    }
+    .btn-primary:hover:not(:disabled) { background: var(--accent-h); }
+    .btn-primary:disabled {
+      opacity: 0.5; cursor: not-allowed;
+    }
+    .btn-secondary {
+      background: var(--input-bg); color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+    .btn-row { display: flex; gap: 8px; margin-top: 8px; }
+    .btn-row .btn { flex: 1; font-size: 11px; padding: 8px; }
+
+    /* ── Status bar ── */
+    #status-bar {
+      margin-top: 10px; padding: 8px 10px;
+      border-radius: 6px; font-size: 12px;
+      display: none; align-items: center; gap: 8px;
+    }
+    #status-bar.info    { background: #1a2035; color: #7b8aff; border: 1px solid #2a3060; }
+    #status-bar.success { background: #0d2b1e; color: var(--success); border: 1px solid #1a4a35; }
+    #status-bar.error   { background: #2b0d0d; color: #ff7b7b; border: 1px solid #4a1a1a; }
+    #status-bar.warning { background: #2b2000; color: var(--warn); border: 1px solid #4a3500; }
+
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid transparent;
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Steps tracker ── */
+    .steps { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+    .step {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px; color: var(--muted);
+    }
+    .step-dot {
+      width: 20px; height: 20px; border-radius: 50%;
+      border: 2px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; flex-shrink: 0;
+      transition: all 0.2s;
+    }
+    .step.active .step-dot { border-color: var(--accent); background: var(--accent); color: #fff; }
+    .step.done .step-dot   { border-color: var(--success); background: var(--success); color: #fff; }
+    .step.active { color: var(--text); }
+    .step.done   { color: var(--success); }
+
+    /* ── Right: Draw.io canvas ── */
+    .canvas-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #0a0c13;
+      position: relative;
+    }
+
+    .canvas-toolbar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 16px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .canvas-toolbar span { font-size: 12px; color: var(--muted); }
+    .canvas-toolbar .spacer { flex: 1; }
+    .toolbar-btn {
+      padding: 5px 12px; border-radius: 6px;
+      background: var(--input-bg); border: 1px solid var(--border);
+      color: var(--text); font-size: 12px; cursor: pointer;
+      transition: all 0.15s; font-family: inherit; font-weight: 500;
+    }
+    .toolbar-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .toolbar-btn.green:hover { border-color: var(--success); color: var(--success); }
+
+    #diagram-frame {
+      flex: 1;
+      border: none;
+      display: block;
+      background: #fff;
+    }
+
+    .placeholder {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      pointer-events: none;
+    }
+    .placeholder-icon { font-size: 56px; margin-bottom: 12px; opacity: 0.15; }
+    .placeholder h2 { font-size: 18px; color: var(--muted); font-weight: 400; }
+    .placeholder p  { font-size: 13px; color: var(--border); margin-top: 6px; }
+
+    /* ── XML Modal ── */
+    .modal-backdrop {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7); z-index: 100;
+      align-items: center; justify-content: center;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 12px; padding: 20px;
+      width: 90%; max-width: 700px; max-height: 80vh;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; }
+    .modal-header h3 { font-size: 14px; font-weight: 700; }
+    .modal-close {
+      background: none; border: none; color: var(--muted);
+      font-size: 18px; cursor: pointer; line-height: 1;
+    }
+    .modal-close:hover { color: var(--text); }
+    .modal textarea {
+      flex: 1; min-height: 340px; font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 12px; resize: none;
+    }
+    .modal-footer { display: flex; gap: 8px; justify-content: flex-end; }
+    .modal-footer .btn { width: auto; padding: 8px 16px; }
+
+    /* ── Voice Input ── */
+    .voice-zone {
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+      background: var(--input-bg);
+      transition: all 0.15s;
+    }
+    .voice-zone.checking {
+      border-color: var(--warn);
+      background: #1e1a10;
+    }
+    .voice-zone.recording {
+      border-color: var(--danger);
+      background: #1e0f0f;
+    }
+    .voice-zone.passed {
+      border-color: var(--success);
+      background: #0d1e15;
+    }
+
+    .voice-meter-wrap {
+      width: 100%; height: 8px;
+      background: var(--border); border-radius: 4px;
+      margin: 10px 0 6px; overflow: hidden;
+    }
+    .voice-meter-bar {
+      height: 100%; width: 0%;
+      border-radius: 4px;
+      transition: width 0.1s, background 0.3s;
+      background: var(--accent);
+    }
+    .voice-meter-bar.good { background: var(--success); }
+    .voice-meter-bar.warn { background: var(--warn); }
+    .voice-meter-bar.bad  { background: var(--danger); }
+
+    .voice-status {
+      font-size: 11px; color: var(--muted);
+      margin-top: 4px; min-height: 16px;
+    }
+    .voice-status.pass { color: var(--success); }
+    .voice-status.fail { color: var(--warn); }
+
+    .voice-timer {
+      font-size: 20px; font-weight: 700;
+      color: var(--text); margin: 6px 0 2px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .recording-pulse {
+      display: inline-block;
+      width: 10px; height: 10px;
+      background: var(--danger);
+      border-radius: 50%;
+      margin-right: 6px;
+      animation: pulse-rec 1s ease-in-out infinite;
+    }
+    @keyframes pulse-rec {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.4; transform: scale(0.7); }
+    }
+
+    .voice-transcript {
+      font-size: 12px; color: var(--text);
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin-top: 8px;
+      min-height: 40px;
+      max-height: 80px;
+      overflow-y: auto;
+      text-align: left;
+      line-height: 1.4;
+    }
+    .voice-transcript.empty {
+      color: var(--muted); font-style: italic;
+    }
+
+    /* ── Transcribing overlay ── */
+    .voice-zone.transcribing {
+      border-color: var(--accent);
+      background: #0d1020;
+    }
+
+    /* ── Settings Modal ── */
+    .settings-modal-backdrop {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.75); z-index: 200;
+      align-items: center; justify-content: center;
+    }
+    .settings-modal-backdrop.open { display: flex; }
+    .settings-modal {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 14px; padding: 24px;
+      width: 92%; max-width: 480px;
+      display: flex; flex-direction: column; gap: 0;
+    }
+    .settings-modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 18px;
+    }
+    .settings-modal-header h3 { font-size: 15px; font-weight: 700; }
+    .settings-modal-close {
+      background: none; border: none; color: var(--muted);
+      font-size: 20px; cursor: pointer; line-height: 1; padding: 2px 6px;
+    }
+    .settings-modal-close:hover { color: var(--text); }
+    .settings-section-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 1px; color: var(--muted);
+      margin: 16px 0 8px;
+    }
+    .settings-section-label:first-of-type { margin-top: 0; }
+    .settings-field { margin-bottom: 12px; }
+    .settings-field label {
+      font-size: 12px; color: var(--muted); margin-bottom: 5px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .settings-field label .key-badge {
+      font-size: 10px; font-weight: 700; padding: 1px 6px;
+      border-radius: 10px; letter-spacing: 0.4px;
+    }
+    .key-badge-gemini { background: #1a2840; color: #7fb3ff; border: 1px solid #2a4060; }
+    .key-badge-groq   { background: #1a2820; color: #7fd4a0; border: 1px solid #2a5040; }
+    .settings-key-wrap { position: relative; }
+    .settings-key-wrap input { padding-right: 36px; }
+    .settings-key-wrap .key-toggle {
+      position: absolute; right: 8px; top: 50%;
+      transform: translateY(-50%);
+      background: none; border: none; color: var(--muted);
+      cursor: pointer; font-size: 14px; padding: 2px;
+    }
+    .settings-key-wrap .key-toggle:hover { color: var(--text); }
+    .settings-hint {
+      font-size: 11px; color: var(--muted); margin-top: 4px;
+      line-height: 1.5;
+    }
+    .settings-hint a { color: var(--accent); text-decoration: none; }
+    .settings-hint a:hover { text-decoration: underline; }
+    .settings-divider {
+      border: none; border-top: 1px solid var(--border);
+      margin: 16px 0 0;
+    }
+    .settings-footer {
+      display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px;
+    }
+    .settings-footer .btn { width: auto; padding: 9px 20px; }
+    .settings-saved-badge {
+      font-size: 11px; color: var(--success); align-self: center;
+      display: none; margin-right: auto;
+    }
+    /* Header settings button */
+    .btn-settings {
+      display: flex; align-items: center; gap: 5px;
+      padding: 5px 12px; border-radius: 6px;
+      background: var(--input-bg); border: 1px solid var(--border);
+      color: var(--muted); font-size: 12px; cursor: pointer;
+      transition: all 0.15s; font-family: inherit; font-weight: 500;
+    }
+    .btn-settings:hover { border-color: var(--accent); color: var(--text); }
+    .btn-settings.has-keys { border-color: #2a5040; color: var(--success); }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════ HEADER ══════════════════════════════════════ -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">⬡</div>
+    <h1>Modha<span>Flow</span></h1>
+    <span class="badge badge-beta">BETA</span>
+  </div>
+  <div class="header-actions">
+    <span id="model-badge" style="font-size:11px;color:var(--muted);">Model: gemini-2.0-flash</span>
+    <button class="btn-settings" id="settings-btn" onclick="openSettings()" title="API Keys & Settings">
+      ⚙ Settings
+    </button>
+  </div>
+</header>
+
+<!-- ══════════════════════════════════════ WORKSPACE ══════════════════════════════════════ -->
+<div class="workspace">
+
+  <!-- ────────────── SIDEBAR ────────────── -->
+  <aside class="sidebar">
+
+    <!-- Configuration -->
+    <div class="section">
+      <div class="section-title">Configuration</div>
+
+      <!-- Hidden legacy field — still used by generateDiagram() internally -->
+      <input type="hidden" id="api-key" />
+
+      <!-- No-key hint — shown until Gemini key is saved -->
+      <div id="config-no-key-hint" style="display:none;">
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;">
+          <span style="font-size:18px;">🔑</span>
+          <div>
+            <div style="font-size:12px;color:var(--text);font-weight:600;">API key not set</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">
+              Open <button onclick="openSettings()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;padding:0;font-family:inherit;">⚙ Settings</button> to add your Gemini key
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Model selector — shown only after key is saved -->
+      <div id="config-model-wrap" style="display:none;">
+        <label style="margin-top:0;">Model</label>
+        <div style="position:relative;">
+          <select id="model-select" style="padding-right:36px;">
+            <option value="" disabled selected>Loading models…</option>
+          </select>
+          <button
+            id="model-refresh-btn"
+            onclick="fetchAndPopulateModels(true)"
+            title="Refresh model list"
+            style="position:absolute;right:28px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 4px;line-height:1;">
+            ↻
+          </button>
+        </div>
+        <div id="model-fetch-status" style="font-size:11px;color:var(--muted);margin-top:5px;min-height:14px;"></div>
+      </div>
+    </div>
+
+    <!-- Flow Type -->
+    <div class="section">
+      <div class="section-title">Flow Settings</div>
+      <label>Flow Type</label>
+      <div class="toggle-row">
+        <button class="toggle-btn active" id="btn-asis"   onclick="setFlowType('AS-IS')">AS-IS</button>
+        <button class="toggle-btn"        id="btn-tobe"   onclick="setFlowType('TO-BE')">TO-BE</button>
+        <button class="toggle-btn"        id="btn-both"   onclick="setFlowType('BOTH')">Both</button>
+      </div>
+      <label style="margin-top:12px;">Process Title</label>
+      <input type="text" id="process-title" placeholder="e.g. Purchase Order Approval" />
+      <label style="margin-top:10px;">Detail Level</label>
+      <select id="detail-level">
+        <option value="standard">Standard (5–8 steps)</option>
+        <option value="detailed">Detailed (9–15 steps)</option>
+        <option value="summary">Summary (3–5 steps)</option>
+      </select>
+    </div>
+
+    <!-- Prompt Input -->
+    <div class="section">
+      <div class="section-title">Process Description</div>
+      <label>Describe the workflow (text prompt)</label>
+      <textarea id="prompt-input"
+        placeholder="e.g. An employee fills a purchase request form, submits to manager for approval. If approved, Finance raises a PO in SAP. If rejected, employee is notified and can revise."></textarea>
+
+      <label style="margin-top:12px;">Or upload a hand-drawn sketch</label>
+      <div class="upload-zone" id="upload-zone">
+        <input type="file" id="file-input" accept="image/*" onchange="handleImageUpload(event)" />
+        <div class="upload-icon">📎</div>
+        <div class="upload-text"><strong>Click to upload</strong> or drag &amp; drop</div>
+        <div class="upload-text" style="margin-top:4px;">PNG, JPG, WEBP — max 10MB</div>
+        <img id="img-preview" alt="Preview" />
+      </div>
+      <button class="btn btn-secondary" id="clear-img-btn" style="margin-top:6px;display:none;font-size:11px;padding:6px;"
+        onclick="clearImage()">✕ Remove image</button>
+
+      <label style="margin-top:12px;">Or describe by voice</label>
+      <div class="voice-zone" id="voice-zone">
+        <!-- Phase 1: Mic test needed -->
+        <div id="voice-check-area">
+          <div class="upload-icon">🎤</div>
+          <div class="upload-text" style="margin-bottom:8px;">Microphone clarity check required</div>
+          <button class="btn btn-secondary" id="voice-check-btn" onclick="startVoiceCheck()" style="font-size:12px;padding:8px 14px;width:auto;display:inline-flex;">
+            🎤 Test Microphone
+          </button>
+        </div>
+
+        <!-- Phase 2: Checking in progress -->
+        <div id="voice-checking-area" style="display:none;">
+          <div style="font-size:12px;color:var(--text);margin-bottom:4px;">🎤 Speak now: <strong>"Testing one two three"</strong></div>
+          <div class="voice-timer" id="voice-timer">10</div>
+          <div class="voice-meter-wrap"><div class="voice-meter-bar" id="voice-meter"></div></div>
+          <div class="voice-status" id="voice-check-status">Listening…</div>
+        </div>
+
+        <!-- Phase 3: Check passed — ready to record -->
+        <div id="voice-ready-area" style="display:none;">
+          <div style="font-size:12px;color:var(--success);margin-bottom:8px;">✓ Microphone ready</div>
+          <button class="btn btn-primary" id="record-btn" onclick="toggleRecording()" style="font-size:12px;padding:8px 14px;width:auto;display:inline-flex;">
+            🎤 Start Recording
+          </button>
+        </div>
+
+        <!-- Phase 4: Recording in progress -->
+        <div id="voice-recording-area" style="display:none;">
+          <div style="font-size:12px;color:var(--text);margin-bottom:4px;"><span class="recording-pulse"></span>Recording…</div>
+          <div class="voice-timer" id="rec-timer">00:00</div>
+          <div class="voice-meter-wrap"><div class="voice-meter-bar" id="rec-meter"></div></div>
+          <div class="voice-status" style="color:var(--muted);margin-top:4px;">Speak freely — click Stop when done</div>
+          <button class="btn btn-secondary" onclick="toggleRecording()" style="font-size:11px;padding:6px 14px;width:auto;display:inline-flex;margin-top:8px;">
+            ⏹ Stop &amp; Transcribe
+          </button>
+        </div>
+
+        <!-- Phase 4b: Transcribing via Groq -->
+        <div id="voice-transcribing-area" style="display:none;">
+          <div style="font-size:12px;color:var(--accent);margin-bottom:8px;">
+            <span class="spinner" style="display:inline-block;width:12px;height:12px;border-width:2px;vertical-align:middle;margin-right:6px;"></span>
+            Transcribing with Whisper…
+          </div>
+          <div class="voice-status" style="color:var(--muted);">Sending audio to Groq — usually under 2 seconds</div>
+        </div>
+
+        <!-- Phase 5: Check failed -->
+        <div id="voice-fail-area" style="display:none;">
+          <div style="font-size:12px;color:var(--warn);margin-bottom:4px;">⚠ Too much background noise</div>
+          <div class="upload-text" style="margin-bottom:8px;">Move to a quieter space for better accuracy</div>
+          <button class="btn btn-secondary" onclick="startVoiceCheck()" style="font-size:12px;padding:8px 14px;width:auto;display:inline-flex;">
+            🔄 Test Again
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Generate -->
+    <div class="section">
+      <button class="btn btn-primary" id="generate-btn" onclick="generateDiagram()">
+        <span>⚡</span> Generate Swimlane Diagram
+      </button>
+
+      <div id="status-bar">
+        <div class="spinner" id="status-spinner" style="display:none;"></div>
+        <span id="status-text"></span>
+      </div>
+
+      <div class="steps" id="steps-tracker" style="display:none;">
+        <div class="step" id="s1"><div class="step-dot" id="d1">1</div><span>Sending to Gemini API</span></div>
+        <div class="step" id="s2"><div class="step-dot" id="d2">2</div><span>Parsing swimlane XML</span></div>
+        <div class="step" id="s3"><div class="step-dot" id="d3">3</div><span>Pushing to Draw.io</span></div>
+        <div class="step" id="s4"><div class="step-dot" id="d4">4</div><span>Diagram ready</span></div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="section">
+      <div class="section-title">Actions</div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="showXmlModal()">📋 View XML</button>
+        <button class="btn btn-secondary" onclick="resetDiagram()">🔄 Reset</button>
+      </div>
+      <div class="btn-row" style="margin-top:0;">
+        <button class="btn btn-secondary green" onclick="exportPNG()">⬇ PNG</button>
+        <button class="btn btn-secondary green" onclick="exportSVG()">⬇ SVG</button>
+      </div>
+      <div class="btn-row" style="margin-top:0;">
+        <button class="btn btn-secondary green" onclick="exportDrawio()">⬇ Draw.io File</button>
+        <button class="btn btn-secondary green" onclick="exportExcel()">⬇ HTML Report</button>
+      </div>
+      <div class="btn-row" style="margin-top:0;">
+        <button class="btn btn-primary" id="export-flow-btn" onclick="exportEnterpriseFlowExcel()" style="background:#1a4a2e;border:1px solid #2d7a4f;">
+          📊 Export as Enterprise Flow (.xlsx)
+        </button>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ────────────── CANVAS ────────────── -->
+  <main class="canvas-area">
+    <div class="canvas-toolbar">
+      <span id="canvas-label">No diagram loaded</span>
+      <div class="spacer"></div>
+      <button class="toolbar-btn" onclick="fitDiagram()" title="Fit diagram to screen">⊞ Fit</button>
+      <button class="toolbar-btn" onclick="toggleFullscreen()">⛶ Fullscreen</button>
+    </div>
+
+    <div class="placeholder" id="placeholder">
+      <div class="placeholder-icon">⬡</div>
+      <h2>Your swimlane diagram will appear here</h2>
+      <p>Describe your workflow on the left, then click Generate</p>
+    </div>
+
+    <iframe
+      id="diagram-frame"
+      style="display:none;"
+      src="https://embed.diagrams.net/?embed=1&spin=1&proto=json&ui=kennedy&noSaveBtn=1&noExitBtn=1&saveAndExit=0"
+      allowfullscreen
+    ></iframe>
+  </main>
+
+</div>
+
+<!-- ══════════════════════════════════════ SETTINGS MODAL ══════════════════════════════════════ -->
+<div class="settings-modal-backdrop" id="settings-modal">
+  <div class="settings-modal">
+    <div class="settings-modal-header">
+      <h3>⚙ Settings — API Keys</h3>
+      <button class="settings-modal-close" onclick="closeSettings()">✕</button>
+    </div>
+
+    <div class="settings-section-label">Diagram Generation</div>
+    <div class="settings-field">
+      <label>Gemini API Key <span class="key-badge key-badge-gemini">GEMINI</span></label>
+      <div class="settings-key-wrap">
+        <input type="password" id="settings-gemini-key" placeholder="AIza…" autocomplete="off" />
+        <button class="key-toggle" onclick="toggleSettingsKey('settings-gemini-key')" title="Show/hide">👁</button>
+      </div>
+      <div class="settings-hint">
+        Used for diagram generation. Free quota available. →
+        <a href="https://aistudio.google.com/apikey" target="_blank">Get key at aistudio.google.com</a>
+      </div>
+    </div>
+
+    <hr class="settings-divider" />
+    <div class="settings-section-label" style="margin-top:16px;">Voice Transcription</div>
+    <div class="settings-field">
+      <label>Groq API Key <span class="key-badge key-badge-groq">GROQ</span></label>
+      <div class="settings-key-wrap">
+        <input type="password" id="settings-groq-key" placeholder="gsk_…" autocomplete="off" />
+        <button class="key-toggle" onclick="toggleSettingsKey('settings-groq-key')" title="Show/hide">👁</button>
+      </div>
+      <div class="settings-hint">
+        Used for Whisper Large v3 voice transcription. Free tier is generous. →
+        <a href="https://console.groq.com/keys" target="_blank">Get key at console.groq.com</a>
+      </div>
+    </div>
+
+    <hr class="settings-divider" />
+    <div class="settings-footer">
+      <span class="settings-saved-badge" id="settings-saved-badge">✓ Saved</span>
+      <button class="btn btn-secondary" onclick="closeSettings()">Cancel</button>
+      <button class="btn btn-primary"   onclick="saveSettings()">💾 Save Keys</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════ XML MODAL ══════════════════════════════════════ -->
+<div class="modal-backdrop" id="xml-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Raw Draw.io XML</h3>
+      <button class="modal-close" onclick="closeXmlModal()">✕</button>
+    </div>
+    <textarea id="xml-editor" spellcheck="false" placeholder="Generated XML will appear here…"></textarea>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" style="width:auto;padding:8px 14px;" onclick="copyXml()">📋 Copy</button>
+      <button class="btn btn-primary"   style="width:auto;padding:8px 14px;" onclick="applyEditedXml()">▶ Apply to Diagram</button>
+      <button class="btn btn-secondary" style="width:auto;padding:8px 14px;" onclick="closeXmlModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════════════════════════
+let flowType      = 'AS-IS';
+let currentXml    = '';
+let currentFlowSpec = null;   // enterprise flow JSON spec (for xlsx export)
+let imageBase64   = null;
+let imageMimeType = null;
+let drawIoReady        = false;
+let pendingXml         = null;
+let pendingExcelExport = false;
+let voiceCheckPassed   = false;
+let isRecording        = false;
+let voiceAudioCtx      = null;
+let voiceStream        = null;
+let recStartTime       = 0;
+// MediaRecorder state (replaces SpeechRecognition)
+let mediaRecorder      = null;
+let audioChunks        = [];
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  DRAW.IO EMBED COMMUNICATION
+// ═══════════════════════════════════════════════════════════════════════════════
+const frame = document.getElementById('diagram-frame');
+
+window.addEventListener('message', (evt) => {
+  // Draw.io only sends objects; guard against strings from other origins
+  let data;
+  try { data = typeof evt.data === 'string' ? JSON.parse(evt.data) : evt.data; }
+  catch { return; }
+
+  if (!data || !data.event) return;
+
+  switch (data.event) {
+    case 'init':
+      drawIoReady = true;
+      if (pendingXml) { sendXmlToDrawio(pendingXml); pendingXml = null; }
+      break;
+    case 'load':
+      stepDone(3); stepActive(4); stepDone(4);
+      setStatus('success', '✓ Diagram rendered successfully');
+      document.getElementById('canvas-label').textContent = `${flowType} — ${document.getElementById('process-title').value || 'Untitled'}`;
+      document.getElementById('generate-btn').disabled = false;
+      break;
+    case 'export':
+      handleExportResponse(data);
+      break;
+    case 'error':
+      setStatus('error', 'Draw.io error: ' + (data.message || 'unknown'));
+      document.getElementById('generate-btn').disabled = false;
+      break;
+  }
+});
+
+function sendXmlToDrawio(xml) {
+  frame.contentWindow.postMessage(
+    JSON.stringify({ action: 'load', autoCrop: true, xml }),
+    '*'
+  );
+  stepDone(2); stepActive(3);
+}
+
+function fitDiagram() {
+  if (!drawIoReady) return;
+  frame.contentWindow.postMessage(JSON.stringify({ action: 'zoom', factor: 'fit' }), '*');
+}
+
+function exportPNG() { pendingExcelExport = false; requestExport('png'); }
+function exportSVG() { pendingExcelExport = false; requestExport('svg'); }
+
+function exportDrawio() {
+  if (!currentXml) return alert('Generate a diagram first.');
+  const blob = new Blob([currentXml], { type: 'application/xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `modhaflow_${Date.now()}.drawio`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  ENTERPRISE FLOW EXCEL EXPORT
+//  Uses currentFlowSpec (JSON) to build a proper shape-based .xlsx via Code.gs
+// ─────────────────────────────────────────────────────────────────────────────
+function exportEnterpriseFlowExcel() {
+  if (!currentFlowSpec) {
+    setStatus('warning', '⚠ No enterprise flow spec available. Generate a diagram first using the Enterprise Flow format.');
+    return;
+  }
+
+  const btn = document.getElementById('export-flow-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Building Excel…';
+  setStatus('info', 'Building enterprise flow Excel — this takes a few seconds…', true);
+
+  if (typeof google === 'undefined' || !google.script) {
+    // Fallback: download spec as JSON for local testing
+    const blob = new Blob([JSON.stringify(currentFlowSpec, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'flow_spec.json'; a.click();
+    URL.revokeObjectURL(url);
+    btn.disabled = false;
+    btn.textContent = '📊 Export as Enterprise Flow (.xlsx)';
+    setStatus('info', '(local mode) Flow spec downloaded as JSON. Deploy as web app for real .xlsx.');
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      btn.disabled = false;
+      btn.textContent = '📊 Export as Enterprise Flow (.xlsx)';
+
+      if (!result.ok) {
+        setStatus('error', '✕ Excel build failed: ' + result.error);
+        console.error('[ModhaFlow Excel]', result.error);
+        return;
+      }
+
+      // Decode base64 → Blob → download
+      const raw      = atob(result.base64);
+      const bytes    = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+      const blob     = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url      = URL.createObjectURL(blob);
+      const a        = document.createElement('a');
+      const title    = (document.getElementById('process-title').value.trim() || 'ProcessFlow').replace(/\s+/g, '_');
+      a.href         = url;
+      a.download     = `${title}_${flowType}_${Date.now()}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setStatus('success', '✓ Enterprise Flow Excel downloaded');
+    })
+    .withFailureHandler(function(err) {
+      btn.disabled = false;
+      btn.textContent = '📊 Export as Enterprise Flow (.xlsx)';
+      setStatus('error', '✕ Excel export failed: ' + err.message);
+      console.error('[ModhaFlow Excel]', err);
+    })
+    .buildEnterpriseFlowExcel(JSON.stringify(currentFlowSpec));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  HTML REPORT EXPORT — captures SVG inline + builds HTML with diagram + table
+// ─────────────────────────────────────────────────────────────────────────────
+function exportExcel() {
+  if (!currentXml)    return alert('Generate a diagram first.');
+  if (!drawIoReady)   return alert('Draw.io is not ready yet.');
+  pendingExcelExport = true;
+  setStatus('info', 'Capturing diagram as SVG…', true);
+  frame.contentWindow.postMessage(
+    JSON.stringify({ action: 'export', format: 'svg', xml: currentXml }),
+    '*'
+  );
+}
+
+// Parses currentXml and returns { processNodes, toolNodes, badgeNodes }
+function _parseXmlForTable() {
+  const parser   = new DOMParser();
+  const doc      = parser.parseFromString(currentXml, 'text/xml');
+  const allCells = Array.from(doc.querySelectorAll('mxCell'));
+
+  // Lane id → label
+  const laneIdToName = {};
+  allCells.forEach(c => {
+    const style = c.getAttribute('style') || '';
+    const id    = c.getAttribute('id')    || '';
+    const val   = c.getAttribute('value') || '';
+    if (style.includes('swimlane') && c.getAttribute('vertex') === '1' && val && id !== 'swim_container') {
+      laneIdToName[id] = val;
+    }
+  });
+
+  const processNodes = [];
+  const toolNodes    = {};
+  const badgeNodes   = {};
+
+  allCells.forEach(c => {
+    const id     = c.getAttribute('id')     || '';
+    const val    = c.getAttribute('value')  || '';
+    const style  = c.getAttribute('style')  || '';
+    const parent = c.getAttribute('parent') || '';
+    if (c.getAttribute('edge') === '1') return;
+    if (!c.getAttribute('vertex'))      return;
+    if (!val || id === '0' || id === '1') return;
+    if (style.includes('swimlane'))     return;
+
+    const geom = c.querySelector('mxGeometry');
+    const xRaw = parseFloat(geom ? geom.getAttribute('x') || '0' : '0');
+    const xKey = Math.round(xRaw / 10) * 10;
+    const laneName = laneIdToName[parent] || '';
+
+    if (laneName.toLowerCase().includes('tool') || laneName.toLowerCase().includes('role')) {
+      toolNodes[xKey] = val; return;
+    }
+    if (laneName.toLowerCase().includes('manual') || laneName.toLowerCase().includes('automat')) {
+      badgeNodes[xKey] = val; return;
+    }
+
+    let type = 'Process';
+    if (style.includes('ellipse'))  type = val.toLowerCase().includes('end') ? 'End' : 'Start';
+    else if (style.includes('rhombus')) type = 'Decision';
+
+    processNodes.push({ id, val, laneName, type, xKey, x: xRaw });
+  });
+
+  processNodes.sort((a, b) => a.x - b.x);
+  return { processNodes, toolNodes, badgeNodes };
+}
+
+// Builds a self-contained HTML report: inline SVG diagram + process-step table
+function buildAndDownloadExcel(svgDataUrl) {
+  const processTitle = document.getElementById('process-title').value.trim() || 'Workflow Process';
+  const { processNodes, toolNodes, badgeNodes } = _parseXmlForTable();
+
+  // Decode SVG from base64 data URL and embed it inline (zero external refs)
+  let inlineSvg = '';
+  try {
+    const b64 = svgDataUrl.split(',')[1];
+    let raw = atob(b64);
+    // Make responsive: remove fixed width/height attrs, add style
+    raw = raw.replace(/(<svg\b[^>]*?)\s+width="[^"]*"/i, '$1')
+             .replace(/(<svg\b[^>]*?)\s+height="[^"]*"/i, '$1')
+             .replace(/<svg\b/, '<svg style="width:100%;height:auto;display:block;"');
+    inlineSvg = raw;
+  } catch(e) {
+    inlineSvg = `<p style="color:#c00">Could not embed diagram: ${e.message}</p>`;
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  const startNodes = processNodes.filter(n => n.type === 'Start');
+  const endNodes   = processNodes.filter(n => n.type === 'End');
+  const midNodes   = processNodes.filter(n => n.type !== 'Start' && n.type !== 'End');
+
+  let tableRows = '';
+  if (startNodes.length)
+    tableRows += `<tr class="row-se"><td>START</td><td>${esc(startNodes[0].val)}</td><td>${esc(startNodes[0].laneName)}</td><td>Start</td><td></td><td></td></tr>`;
+  let stepNum = 0;
+  midNodes.forEach(node => {
+    stepNum++;
+    tableRows += `<tr><td>${stepNum}</td><td>${esc(node.val)}</td><td>${esc(node.laneName)}</td><td>${esc(node.type)}</td><td>${esc(badgeNodes[node.xKey]||'')}</td><td>${esc(toolNodes[node.xKey]||'')}</td></tr>`;
+  });
+  if (endNodes.length)
+    tableRows += `<tr class="row-se"><td>END</td><td>${esc(endNodes[0].val)}</td><td>${esc(endNodes[0].laneName)}</td><td>End</td><td></td><td></td></tr>`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>${esc(processTitle)} — Process Flow (${esc(flowType)})</title>
+<style>
+  body  { font-family:Arial,sans-serif; margin:0; padding:20px 28px; color:#222; }
+  h1    { background:#595959; color:#fff; padding:11px 16px; font-size:15px;
+          margin:0 0 18px; border-radius:4px; }
+  .flow { border:1px solid #ccc; border-radius:4px; background:#fff;
+          padding:12px; margin-bottom:24px; overflow-x:auto; }
+  h2    { font-size:13px; color:#444; margin:0 0 8px; font-weight:700; }
+  table { border-collapse:collapse; width:100%; font-size:12px; }
+  th    { background:#808080; color:#fff; padding:8px 10px; text-align:left;
+          border:1px solid #666; white-space:nowrap; }
+  td    { padding:7px 10px; border:1px solid #ccc; vertical-align:middle; }
+  tr:nth-child(even) td { background:#f7f7f7; }
+  .row-se td { background:#d9d9d9; font-weight:bold; }
+  @media print { body{padding:10px} }
+</style>
+</head>
+<body>
+  <h1>${esc(processTitle)} — Process Flow (${esc(flowType)})</h1>
+  <div class="flow">${inlineSvg}</div>
+  <h2>Process Steps</h2>
+  <table>
+    <thead><tr><th>Step No.</th><th>Activity</th><th>Swimlane</th><th>Type</th><th>Manual / Auto</th><th>Tools / Systems</th></tr></thead>
+    <tbody>${tableRows}</tbody>
+  </table>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `${processTitle.replace(/\s+/g,'_')}_ProcessFlow.html`;
+  a.click();
+  URL.revokeObjectURL(url);
+  setStatus('success', `✓ HTML report saved — open in any browser to see the flow diagram + ${stepNum} process steps`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  XML POST-PROCESSOR — auto-corrects container + lane widths/heights so nodes
+//  never render outside the swimlane box
+// ─────────────────────────────────────────────────────────────────────────────
+function fixContainerSize(xmlStr) {
+  try {
+    const doc = new DOMParser().parseFromString(xmlStr, 'text/xml');
+    if (doc.querySelector('parsererror')) return xmlStr;
+
+    const all = Array.from(doc.querySelectorAll('mxCell'));
+
+    // Identify lane cells
+    const laneIds = new Set(
+      all.filter(c => {
+        const s  = c.getAttribute('style') || '';
+        const id = c.getAttribute('id')    || '';
+        return s.includes('swimlane') && !['0','1','swim_container'].includes(id);
+      }).map(c => c.getAttribute('id'))
+    );
+
+    // Find the rightmost edge across all content nodes (x relative to their lane)
+    let maxRight = 400;
+    all.forEach(c => {
+      const id = c.getAttribute('id') || '';
+      if (['0','1','swim_container'].includes(id) || laneIds.has(id)) return;
+      if (c.getAttribute('edge') === '1' || !c.getAttribute('vertex')) return;
+      const g = c.querySelector('mxGeometry');
+      if (!g) return;
+      const r = +(g.getAttribute('x')||0) + +(g.getAttribute('width')||0);
+      if (r > maxRight) maxRight = r;
+    });
+    const newW = Math.max(maxRight + 100, 900);
+
+    // Find the bottom of the last lane
+    let laneBottom = 300;
+    all.forEach(c => {
+      if (!laneIds.has(c.getAttribute('id')||'')) return;
+      const g = c.querySelector('mxGeometry');
+      if (!g) return;
+      const b = +(g.getAttribute('y')||0) + +(g.getAttribute('height')||0);
+      if (b > laneBottom) laneBottom = b;
+    });
+    const newH = laneBottom + 35 + 20; // 35 = container title bar, 20 = bottom buffer
+
+    // Patch container
+    const cont = all.find(c => c.getAttribute('id') === 'swim_container');
+    if (cont) {
+      const g = cont.querySelector('mxGeometry');
+      if (g) { g.setAttribute('width', String(newW)); g.setAttribute('height', String(newH)); }
+    }
+    // Patch every lane width
+    all.forEach(c => {
+      if (!laneIds.has(c.getAttribute('id')||'')) return;
+      const g = c.querySelector('mxGeometry');
+      if (g) g.setAttribute('width', String(newW));
+    });
+
+    // Serialize and strip namespace attrs injected by XMLSerializer
+    const raw   = new XMLSerializer().serializeToString(doc);
+    const clean = raw.replace(/\s+xmlns(?::[a-z0-9]+)?="[^"]*"/g, '');
+    const s = clean.indexOf('<mxGraphModel');
+    const e = clean.lastIndexOf('</mxGraphModel>');
+    return s !== -1 && e !== -1 ? clean.slice(s, e + 15) : xmlStr;
+  } catch(err) {
+    console.warn('[ModhaFlow] fixContainerSize skipped:', err);
+    return xmlStr;
+  }
+}
+
+function requestExport(format) {
+  if (!currentXml) return alert('Generate a diagram first.');
+  if (!drawIoReady) return;
+  frame.contentWindow.postMessage(JSON.stringify({ action: 'export', format, xml: currentXml }), '*');
+}
+
+function handleExportResponse(data) {
+  if (!data.data) return;
+
+  // SVG captured — build the self-contained HTML report
+  if (pendingExcelExport) {
+    pendingExcelExport = false;
+    buildAndDownloadExcel(data.data);
+    return;
+  }
+
+  const a   = document.createElement('a');
+  a.href    = data.data;
+  const ext = data.format === 'xmlpng' ? 'png' : data.format;
+  a.download = `modhaflow_${Date.now()}.${ext}`;
+  a.click();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  UI HELPERS
+// ═══════════════════════════════════════════════════════════════════════════════
+function setFlowType(t) {
+  flowType = t;
+  ['asis','tobe','both'].forEach(id => {
+    document.getElementById('btn-' + id).classList.remove('active');
+  });
+  const map = { 'AS-IS':'asis', 'TO-BE':'tobe', 'BOTH':'both' };
+  document.getElementById('btn-' + map[t]).classList.add('active');
+}
+
+function toggleKey() {
+  // Legacy — no longer used in sidebar but kept safe
+  const inp = document.getElementById('api-key');
+  if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  MODEL FETCHING — hardcoded defaults instantly, live list via Code.gs (no CORS)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Shown immediately — always works, no network needed
+const HARDCODED_MODELS = [
+  { id: 'gemini-2.5-flash',          displayName: 'Gemini 2.5 Flash ✦ Recommended' },
+  { id: 'gemini-2.5-pro',            displayName: 'Gemini 2.5 Pro' },
+  { id: 'gemini-2.5-flash-lite',     displayName: 'Gemini 2.5 Flash Lite' },
+  { id: 'gemini-2.0-flash',          displayName: 'Gemini 2.0 Flash' },
+  { id: 'gemini-2.0-flash-exp',      displayName: 'Gemini 2.0 Flash Exp' },
+  { id: 'gemini-1.5-flash',          displayName: 'Gemini 1.5 Flash' },
+  { id: 'gemini-1.5-pro',            displayName: 'Gemini 1.5 Pro' },
+];
+
+function formatModelLabel(modelId) {
+  return modelId
+    .replace(/^models\//, '')
+    .replace(/gemini-/i, 'Gemini ')
+    .replace(/-/g, ' ')
+    .replace(/\b(\w)/g, c => c.toUpperCase())
+    .trim();
+}
+
+function fetchAndPopulateModels(forceRefresh = false) {
+  const apiKey = localStorage.getItem('mf_gemini_key') || '';
+  if (!apiKey) return;
+
+  const statusEl = document.getElementById('model-fetch-status');
+
+  // ── Step 1: Show hardcoded defaults instantly ────────────────────────────
+  const cached = sessionStorage.getItem('mf_models_cache');
+  if (cached && !forceRefresh) {
+    populateModelDropdown(JSON.parse(cached));
+    return;
+  }
+
+  // Always show hardcoded list first so dropdown is never empty
+  populateModelDropdown(HARDCODED_MODELS);
+
+  // ── Step 2: Background fetch via Code.gs (no CORS) ───────────────────────
+  statusEl.textContent = '⏳ Checking your key for available models…';
+  statusEl.style.color = 'var(--muted)';
+  document.getElementById('model-refresh-btn').style.opacity = '0.4';
+
+  // google.script.run is only available in deployed Apps Script web apps
+  if (typeof google === 'undefined' || !google.script) {
+    // Running locally / direct file open — skip server fetch, defaults are fine
+    statusEl.textContent = '(defaults — deploy as web app for live model list)';
+    document.getElementById('model-refresh-btn').style.opacity = '1';
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      document.getElementById('model-refresh-btn').style.opacity = '1';
+
+      if (result.error) {
+        statusEl.textContent = '⚠ ' + result.error;
+        statusEl.style.color = 'var(--warn)';
+        // Hardcoded list is already shown — no further action needed
+        return;
+      }
+
+      const models = result.models || [];
+      if (models.length === 0) {
+        statusEl.textContent = '⚠ No generateContent models found for this key.';
+        statusEl.style.color = 'var(--warn)';
+        return;
+      }
+
+      sessionStorage.setItem('mf_models_cache', JSON.stringify(models));
+      populateModelDropdown(models);
+      statusEl.textContent = '✓ ' + models.length + ' models loaded from your account';
+      statusEl.style.color = 'var(--success)';
+      setTimeout(() => { statusEl.textContent = ''; }, 3500);
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById('model-refresh-btn').style.opacity = '1';
+      // Silent — hardcoded defaults are already visible, user is unaffected
+      console.warn('[ModhaFlow] Server model fetch failed:', err);
+      statusEl.textContent = '';
+    })
+    .getGeminiModels(apiKey);
+}
+
+function populateModelDropdown(models) {
+  const select      = document.getElementById('model-select');
+  const previousVal = select.value;
+
+  select.innerHTML = '';
+
+  // Group by version family e.g. gemini-2-5 → "Gemini 2.5"
+  const groups = {};
+  models.forEach(m => {
+    const parts = m.id.split('-');           // ['gemini','2','5','flash',...]
+    const key   = parts.slice(0, 3).join('-'); // 'gemini-2-5'
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(m);
+  });
+
+  // Sort group keys so newer versions appear first
+  const sortedKeys = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+
+  sortedKeys.forEach(groupKey => {
+    const label = groupKey
+      .replace(/^gemini-/, 'Gemini ')
+      .replace(/-(\d)/, '.$1');             // 'gemini-2-5' → 'Gemini 2.5'
+    const og = document.createElement('optgroup');
+    og.label = label;
+    groups[groupKey].forEach(m => {
+      const opt       = document.createElement('option');
+      opt.value       = m.id;
+      opt.textContent = m.displayName;
+      opt.title       = m.description || '';
+      og.appendChild(opt);
+    });
+    select.appendChild(og);
+  });
+
+  // Restore previous selection or pick 2.5-flash as default
+  if (previousVal && [...select.options].some(o => o.value === previousVal)) {
+    select.value = previousVal;
+  } else {
+    const preferred = [...select.options].find(o => o.value.includes('2.5-flash'));
+    if (preferred) select.value = preferred.value;
+  }
+
+  // Sync header badge
+  document.getElementById('model-badge').textContent = 'Model: ' + select.value;
+  select.onchange = () => {
+    document.getElementById('model-badge').textContent = 'Model: ' + select.value;
+  };
+}
+
+// ── Show/hide config UI + load keys on startup ────────────────────────────────
+function loadSavedKeys() {
+  const gKey = localStorage.getItem('mf_gemini_key');
+  if (gKey) {
+    document.getElementById('api-key').value = gKey;
+    document.getElementById('config-no-key-hint').style.display = 'none';
+    document.getElementById('config-model-wrap').style.display  = 'block';
+    fetchAndPopulateModels();
+  } else {
+    document.getElementById('config-no-key-hint').style.display = 'block';
+    document.getElementById('config-model-wrap').style.display  = 'none';
+  }
+  updateSettingsButtonState();
+}
+
+function setStatus(type, msg, spinner = false) {
+  const bar  = document.getElementById('status-bar');
+  const text = document.getElementById('status-text');
+  const spn  = document.getElementById('status-spinner');
+  bar.className = type;
+  bar.style.display = 'flex';
+  text.textContent = msg;
+  spn.style.display = spinner ? 'block' : 'none';
+}
+
+function stepActive(n) {
+  const el = document.getElementById('s' + n);
+  if (el) el.className = 'step active';
+}
+function stepDone(n) {
+  const el  = document.getElementById('s'  + n);
+  const dot = document.getElementById('d' + n);
+  if (el)  el.className  = 'step done';
+  if (dot) dot.textContent = '✓';
+}
+function resetSteps() {
+  for (let i = 1; i <= 4; i++) {
+    const el  = document.getElementById('s'  + i);
+    const dot = document.getElementById('d' + i);
+    if (el)  el.className  = 'step';
+    if (dot) dot.textContent = String(i);
+  }
+}
+
+function showXmlModal() {
+  if (!currentXml) return alert('Generate a diagram first.');
+  document.getElementById('xml-editor').value = currentXml;
+  document.getElementById('xml-modal').classList.add('open');
+}
+function closeXmlModal() {
+  document.getElementById('xml-modal').classList.remove('open');
+}
+function copyXml() {
+  navigator.clipboard.writeText(document.getElementById('xml-editor').value)
+    .then(() => setStatus('success', '✓ XML copied to clipboard'))
+    .catch(() => alert('Copy failed—select all and copy manually.'));
+}
+function applyEditedXml() {
+  const xml = document.getElementById('xml-editor').value.trim();
+  if (!xml) return;
+  currentXml = xml;
+  pushDiagram(xml);
+  closeXmlModal();
+}
+
+function resetDiagram() {
+  currentXml  = '';
+  drawIoReady = false;
+  pendingXml  = null;
+  const bar = document.getElementById('status-bar');
+  bar.style.display = 'none';
+  document.getElementById('steps-tracker').style.display = 'none';
+  document.getElementById('canvas-label').textContent = 'No diagram loaded';
+  document.getElementById('placeholder').style.display = 'block';
+  document.getElementById('diagram-frame').style.display = 'none';
+  // Reload iframe to get a fresh Draw.io instance
+  frame.src = frame.src;
+  // Reset voice check so user must re-test mic
+  resetVoiceCheck();
+}
+
+function toggleFullscreen() {
+  const canvas = document.querySelector('.canvas-area');
+  if (!document.fullscreenElement) canvas.requestFullscreen().catch(() => {});
+  else document.exitFullscreen();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  SETTINGS — API Key storage in localStorage
+// ═══════════════════════════════════════════════════════════════════════════════
+function openSettings() {
+  // Pre-fill inputs from localStorage
+  const gKey = localStorage.getItem('mf_gemini_key') || '';
+  const grKey = localStorage.getItem('mf_groq_key')  || '';
+  document.getElementById('settings-gemini-key').value = gKey;
+  document.getElementById('settings-groq-key').value   = grKey;
+  document.getElementById('settings-saved-badge').style.display = 'none';
+  document.getElementById('settings-modal').classList.add('open');
+}
+
+function closeSettings() {
+  document.getElementById('settings-modal').classList.remove('open');
+}
+
+function saveSettings() {
+  const gKey  = document.getElementById('settings-gemini-key').value.trim();
+  const grKey = document.getElementById('settings-groq-key').value.trim();
+
+  const prevGKey = localStorage.getItem('mf_gemini_key');
+
+  if (gKey)  localStorage.setItem('mf_gemini_key', gKey);
+  else       localStorage.removeItem('mf_gemini_key');
+
+  if (grKey) localStorage.setItem('mf_groq_key', grKey);
+  else       localStorage.removeItem('mf_groq_key');
+
+  // Sync hidden field used by generateDiagram
+  document.getElementById('api-key').value = gKey || '';
+
+  // If Gemini key changed, bust the model cache so fresh fetch happens
+  if (gKey !== prevGKey) sessionStorage.removeItem('mf_models_cache');
+
+  updateSettingsButtonState();
+
+  // Show saved badge briefly, then close and refresh config panel
+  const badge = document.getElementById('settings-saved-badge');
+  badge.style.display = 'inline';
+  setTimeout(() => {
+    badge.style.display = 'none';
+    closeSettings();
+    loadSavedKeys(); // refresh hint vs model dropdown
+  }, 900);
+}
+
+function toggleSettingsKey(inputId) {
+  const inp = document.getElementById(inputId);
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+function updateSettingsButtonState() {
+  const btn   = document.getElementById('settings-btn');
+  const hasG  = !!localStorage.getItem('mf_gemini_key');
+  const hasGr = !!localStorage.getItem('mf_groq_key');
+  if (hasG && hasGr) {
+    btn.classList.add('has-keys');
+    btn.title = 'API keys saved — click to update';
+  } else {
+    btn.classList.remove('has-keys');
+    btn.title = 'API Keys & Settings';
+  }
+}
+
+
+
+// Close settings modal on backdrop click
+document.getElementById('settings-modal').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('settings-modal')) closeSettings();
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  VOICE INPUT — Mic Check + MediaRecorder + Groq Whisper Transcription
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function showVoicePhase(phase) {
+  ['voice-check-area','voice-checking-area','voice-ready-area',
+   'voice-recording-area','voice-transcribing-area','voice-fail-area']
+    .forEach(id => document.getElementById(id).style.display = 'none');
+  document.getElementById(phase).style.display = 'block';
+  const zone = document.getElementById('voice-zone');
+  zone.className = 'voice-zone';
+  if (phase === 'voice-checking-area')   zone.classList.add('checking');
+  if (phase === 'voice-recording-area')  zone.classList.add('recording');
+  if (phase === 'voice-ready-area')      zone.classList.add('passed');
+  if (phase === 'voice-transcribing-area') zone.classList.add('transcribing');
+}
+
+function resetVoiceCheck() {
+  voiceCheckPassed = false;
+  if (isRecording) stopRecording();
+  cleanupVoiceResources();
+  showVoicePhase('voice-check-area');
+}
+
+function cleanupVoiceResources() {
+  if (voiceStream) { voiceStream.getTracks().forEach(t => t.stop()); voiceStream = null; }
+  if (voiceAudioCtx && voiceAudioCtx.state !== 'closed') { voiceAudioCtx.close().catch(()=>{}); voiceAudioCtx = null; }
+}
+
+// ── Mic Clarity Check (unchanged logic, same 10s Web Audio API test) ──────────
+async function startVoiceCheck() {
+  try {
+    voiceStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch(e) {
+    alert('Microphone access denied. Please allow microphone access and try again.');
+    return;
+  }
+
+  showVoicePhase('voice-checking-area');
+  const meter  = document.getElementById('voice-meter');
+  const timer  = document.getElementById('voice-timer');
+  const status = document.getElementById('voice-check-status');
+
+  voiceAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const source   = voiceAudioCtx.createMediaStreamSource(voiceStream);
+  const analyser = voiceAudioCtx.createAnalyser();
+  analyser.fftSize = 2048;
+  source.connect(analyser);
+  const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+  let elapsed = 0;
+  const totalMs = 10000;
+  const intervalMs = 100;
+  let peakRms = 0;
+  let rmsSamples = [];
+  let speechFrames = 0;
+  const SPEECH_THRESHOLD = 0.04;
+  const NOISE_THRESHOLD  = 0.025;
+
+  const checkInterval = setInterval(() => {
+    elapsed += intervalMs;
+    const remaining = Math.ceil((totalMs - elapsed) / 1000);
+    timer.textContent = remaining;
+
+    analyser.getByteTimeDomainData(dataArray);
+    let sum = 0;
+    for (let i = 0; i < dataArray.length; i++) {
+      const v = (dataArray[i] - 128) / 128;
+      sum += v * v;
+    }
+    const rms = Math.sqrt(sum / dataArray.length);
+    rmsSamples.push(rms);
+    if (rms > peakRms) peakRms = rms;
+    if (rms > SPEECH_THRESHOLD) speechFrames++;
+
+    const pct = Math.min(rms * 500, 100);
+    meter.style.width = pct + '%';
+    meter.className = 'voice-meter-bar' + (rms > SPEECH_THRESHOLD ? ' good' : rms > NOISE_THRESHOLD ? ' warn' : '');
+
+    if (rms > SPEECH_THRESHOLD)     status.textContent = '🗣️ Speech detected — good!';
+    else if (rms > NOISE_THRESHOLD) status.textContent = '🔊 Background noise detected…';
+    else                            status.textContent = 'Listening…';
+
+    if (elapsed >= totalMs) {
+      clearInterval(checkInterval);
+      evaluateVoiceCheck(rmsSamples, speechFrames, peakRms);
+    }
+  }, intervalMs);
+}
+
+function evaluateVoiceCheck(rmsSamples, speechFrames, peakRms) {
+  cleanupVoiceResources();
+
+  const sorted    = [...rmsSamples].sort((a,b) => a - b);
+  const lower30   = sorted.slice(0, Math.floor(sorted.length * 0.3));
+  const noiseFloor = lower30.reduce((a,b) => a+b, 0) / (lower30.length || 1);
+
+  const speechOk = speechFrames >= 15;
+  const noiseOk  = noiseFloor < 0.025;
+  const snrOk    = peakRms > 0 && (peakRms / (noiseFloor + 0.001)) > 3;
+
+  if (speechOk && (noiseOk || snrOk)) {
+    voiceCheckPassed = true;
+    showVoicePhase('voice-ready-area');
+  } else {
+    voiceCheckPassed = false;
+    showVoicePhase('voice-fail-area');
+    if (!speechOk) {
+      const failArea = document.getElementById('voice-fail-area');
+      failArea.querySelector('div').innerHTML = '⚠ No clear speech detected';
+      failArea.querySelectorAll('div')[1].textContent = 'Speak clearly: "Testing one two three" during the test';
+    }
+  }
+}
+
+// ── Main Recording Toggle ──────────────────────────────────────────────────────
+function toggleRecording() {
+  if (isRecording) stopRecording();
+  else startRecording();
+}
+
+// ── Start: MediaRecorder captures full session until user stops ───────────────
+async function startRecording() {
+  // Validate Groq key first
+  const groqKey = localStorage.getItem('mf_groq_key') || '';
+  if (!groqKey) {
+    setStatus('warning', '⚠ Groq API key not set. Open ⚙ Settings and add your Groq key (free at console.groq.com).');
+    return;
+  }
+
+  try {
+    voiceStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch(e) {
+    alert('Microphone access denied.');
+    return;
+  }
+
+  isRecording  = true;
+  audioChunks  = [];
+  showVoicePhase('voice-recording-area');
+
+  // ── Live audio meter (Web Audio API) ─────────────────────────────────────
+  voiceAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const source   = voiceAudioCtx.createMediaStreamSource(voiceStream);
+  const analyser = voiceAudioCtx.createAnalyser();
+  analyser.fftSize = 2048;
+  source.connect(analyser);
+  const dataArray  = new Uint8Array(analyser.frequencyBinCount);
+  const recMeter   = document.getElementById('rec-meter');
+
+  const meterInterval = setInterval(() => {
+    if (!isRecording) { clearInterval(meterInterval); return; }
+    analyser.getByteTimeDomainData(dataArray);
+    let sum = 0;
+    for (let i = 0; i < dataArray.length; i++) { const v = (dataArray[i]-128)/128; sum += v*v; }
+    const rms = Math.sqrt(sum / dataArray.length);
+    recMeter.style.width = Math.min(rms * 500, 100) + '%';
+    recMeter.className = 'voice-meter-bar' + (rms > 0.04 ? ' good' : '');
+  }, 100);
+
+  // ── Elapsed timer ─────────────────────────────────────────────────────────
+  recStartTime = Date.now();
+  const recTimerEl = document.getElementById('rec-timer');
+  const timerInterval = setInterval(() => {
+    if (!isRecording) { clearInterval(timerInterval); return; }
+    const sec = Math.floor((Date.now() - recStartTime) / 1000);
+    const m = String(Math.floor(sec / 60)).padStart(2, '0');
+    const s = String(sec % 60).padStart(2, '0');
+    recTimerEl.textContent = m + ':' + s;
+  }, 200);
+
+  // ── MediaRecorder ─────────────────────────────────────────────────────────
+  const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+    ? 'audio/webm;codecs=opus' : 'audio/webm';
+
+  mediaRecorder = new MediaRecorder(voiceStream, { mimeType });
+  mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
+  mediaRecorder.start(250); // collect chunk every 250ms
+}
+
+// ── Stop: hand off to Groq Whisper ────────────────────────────────────────────
+function stopRecording() {
+  if (!isRecording) return;
+  isRecording = false;
+
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    // onstop fires after stop() — we do the async work there
+    mediaRecorder.onstop = async () => {
+      cleanupVoiceResources();
+      const groqKey = localStorage.getItem('mf_groq_key') || '';
+      showVoicePhase('voice-transcribing-area');
+
+      try {
+        const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+        const transcript = await transcribeWithGroq(audioBlob, groqKey);
+
+        if (transcript && transcript.trim()) {
+          const promptEl  = document.getElementById('prompt-input');
+          const existing  = promptEl.value.trim();
+          promptEl.value  = existing ? existing + '\n\n' + transcript.trim() : transcript.trim();
+          setStatus('success', `✓ Transcription added to prompt (${transcript.trim().split(/\s+/).length} words)`);
+        } else {
+          setStatus('warning', '⚠ No speech detected in recording. Try again.');
+        }
+      } catch(err) {
+        console.error('[ModhaFlow Voice]', err);
+        setStatus('error', '✕ Transcription failed: ' + err.message);
+      } finally {
+        audioChunks = [];
+        mediaRecorder = null;
+        showVoicePhase('voice-ready-area');
+      }
+    };
+    mediaRecorder.stop();
+  } else {
+    cleanupVoiceResources();
+    showVoicePhase('voice-ready-area');
+  }
+}
+
+// ── Groq Whisper Large v3 transcription ───────────────────────────────────────
+async function transcribeWithGroq(audioBlob, groqKey) {
+  const formData = new FormData();
+  formData.append('file', audioBlob, 'recording.webm');
+  formData.append('model', 'whisper-large-v3');
+  formData.append('response_format', 'json');
+  formData.append('language', 'en');
+  // Domain vocabulary bias: Whisper will favour these terms over phonetically similar ones
+  formData.append('prompt', 'swimlane diagram, process flow, decision node, actor, lane, connector, approval, requestor, approver');
+
+  const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+    method:  'POST',
+    headers: { 'Authorization': `Bearer ${groqKey}` },
+    body:    formData
+  });
+
+  if (!res.ok) {
+    let errMsg = `Groq API error ${res.status}`;
+    try { const j = await res.json(); errMsg = j?.error?.message || errMsg; } catch {}
+    throw new Error(errMsg);
+  }
+
+  const data = await res.json();
+  return cleanTranscript(data.text || '');
+}
+
+// ── Post-processing: strip common filler words ────────────────────────────────
+function cleanTranscript(text) {
+  return text
+    .replace(/\b(um+|uh+|er+|ah+|hmm+)\b[,.]?\s*/gi, '')
+    .replace(/\byou know[,.]?\s*/gi, '')
+    .replace(/\bi mean[,.]?\s*/gi, '')
+    .replace(/\blike,\s+(?=[a-z])/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  IMAGE UPLOAD
+// ═══════════════════════════════════════════════════════════════════════════════
+function handleImageUpload(evt) {
+  const file = evt.target.files[0];
+  if (!file) return;
+  if (file.size > 10 * 1024 * 1024) { alert('File exceeds 10 MB limit.'); return; }
+
+  imageMimeType = file.type || 'image/png';
+  const reader  = new FileReader();
+  reader.onload = (e) => {
+    const result    = e.target.result;          // data:image/png;base64,XXXX
+    imageBase64     = result.split(',')[1];     // just the base64 part
+    const preview   = document.getElementById('img-preview');
+    preview.src     = result;
+    preview.style.display = 'block';
+    document.getElementById('clear-img-btn').style.display = 'block';
+    setStatus('info', 'Image loaded — include a prompt or leave blank for auto-detection');
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearImage() {
+  imageBase64   = null;
+  imageMimeType = null;
+  document.getElementById('img-preview').src = '';
+  document.getElementById('img-preview').style.display = 'none';
+  document.getElementById('file-input').value = '';
+  document.getElementById('clear-img-btn').style.display = 'none';
+}
+
+// Drag-over styling
+const uploadZone = document.getElementById('upload-zone');
+uploadZone.addEventListener('dragover',  (e) => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', ()  => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    document.getElementById('file-input').files = e.dataTransfer.files;
+    handleImageUpload({ target: { files: e.dataTransfer.files } });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  DRAW.IO XML TEMPLATE (injected into the Gemini system prompt)
+// ═══════════════════════════════════════════════════════════════════════════════
+const XML_TEMPLATE = `<mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+
+    <!-- SWIMLANE CONTAINER: value = process title + flow type -->
+    <mxCell id="swim_container" value="[PROCESS TITLE] (AS-IS)"
+      style="swimlane;html=1;childLayout=stackLayout;horizontal=1;startSize=35;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=1;collapsible=0;marginBottom=0;fontSize=14;fontStyle=1;fillColor=#595959;fontColor=#ffffff;strokeColor=#404040;strokeWidth=2;"
+      vertex="1" parent="1">
+      <mxGeometry x="20" y="20" width="1600" height="500" as="geometry" />
+    </mxCell>
+
+    <!-- LANE 1 — Tools / Roles -->
+    <mxCell id="lane_tools" value="Tools / Roles"
+      style="swimlane;html=1;startSize=30;swimlaneLine=1;fontStyle=1;collapsible=0;horizontal=0;fillColor=#bfbfbf;strokeColor=#808080;fontSize=12;fontColor=#000000;"
+      vertex="1" parent="swim_container">
+      <mxGeometry y="35" width="1600" height="100" as="geometry" />
+    </mxCell>
+
+    <!-- LANE 2 — Requestor -->
+    <mxCell id="lane_req" value="Requestor"
+      style="swimlane;html=1;startSize=30;swimlaneLine=1;fontStyle=1;collapsible=0;horizontal=0;fillColor=#ffffff;strokeColor=#999999;fontSize=12;fontColor=#000000;"
+      vertex="1" parent="swim_container">
+      <mxGeometry y="135" width="1600" height="140" as="geometry" />
+    </mxCell>
+
+    <!-- LANE 3 — Approver -->
+    <mxCell id="lane_appr" value="Approver"
+      style="swimlane;html=1;startSize=30;swimlaneLine=1;fontStyle=1;collapsible=0;horizontal=0;fillColor=#ffffff;strokeColor=#999999;fontSize=12;fontColor=#000000;"
+      vertex="1" parent="swim_container">
+      <mxGeometry y="275" width="1600" height="140" as="geometry" />
+    </mxCell>
+
+    <!-- LANE 4 — Manual / Automated -->
+    <mxCell id="lane_proc" value="Manual / Automated"
+      style="swimlane;html=1;startSize=30;swimlaneLine=1;fontStyle=1;collapsible=0;horizontal=0;fillColor=#bfbfbf;strokeColor=#808080;fontSize=12;fontColor=#000000;"
+      vertex="1" parent="swim_container">
+      <mxGeometry y="415" width="1600" height="100" as="geometry" />
+    </mxCell>
+
+    <!--
+      NODES — child of the appropriate lane cell. x/y relative to the LANE.
+      STEP COLUMN x values (relative to lane, after the 30px header):
+        Step 1: x=40   Step 2: x=290   Step 3: x=540   Step 4: x=790 ...
+        Each step is spaced 250px apart. Column centre = x + 80 (for 160px nodes) or x + 65 (for 130px diamonds).
+      SHAPES:
+        Start/End          : ellipse; width=80, height=40; fillColor=#d9d9d9; strokeColor=#808080
+        Process step       : rounded=1;arcSize=40; width=160, height=45; fillColor=#ffffff; strokeColor=#808080
+        Decision           : rhombus; width=130, height=65; fillColor=#e8e8e8; strokeColor=#808080
+        Tool label (lane1) : rounded=1;arcSize=20; width=160, height=30; fillColor=#f0f0f0; strokeColor=#aaaaaa
+        Badge (lane4)      : rounded=1;arcSize=20; width=110, height=28; fillColor=#e8e8e8; strokeColor=#808080
+      Y CENTRES:
+        Requestor/Approver (130px lane): 45px node → y=42;  65px diamond → y=32
+        Tools/Manual (100px lane):       30px box  → y=35;  28px badge   → y=36
+    -->
+
+    <!-- ── Start node in Requestor lane ── -->
+    <mxCell id="n_start" value="Start"
+      style="ellipse;whiteSpace=wrap;overflow=hidden;html=1;fillColor=#d9d9d9;strokeColor=#808080;fontSize=11;fontStyle=1;"
+      vertex="1" parent="lane_req">
+      <mxGeometry x="40" y="49" width="90" height="42" as="geometry" />
+    </mxCell>
+
+    <!-- ── Step 1: First process step (column 1 → x=200) ── -->
+    <mxCell id="n1" value="Submit Request Form"
+      style="rounded=1;arcSize=40;whiteSpace=wrap;overflow=hidden;html=1;fillColor=#ffffff;strokeColor=#808080;fontSize=11;"
+      vertex="1" parent="lane_req">
+      <mxGeometry x="200" y="45" width="200" height="50" as="geometry" />
+    </mxCell>
+
+    <!-- ── Tool label for Step 1 (same x=200) ── -->
+    <mxCell id="t1" value="Email / Form Portal"
+      style="rounded=1;arcSize=20;whiteSpace=wrap;overflow=hidden;html=1;fillColor=#f0f0f0;strokeColor=#aaaaaa;fontSize=10;fontColor=#333333;"
+      vertex="1" parent="lane_tools">
+      <mxGeometry x="200" y="33" width="200" height="34" as="geometry" />
+    </mxCell>
+
+    <!-- ── Badge for Step 1 ── -->
+    <mxCell id="p1" value="MANUAL"
+      style="rounded=1;arcSize=20;whiteSpace=wrap;overflow=hidden;html=1;fillColor=#e8e8e8;strokeColor=#808080;fontSize=10;fontStyle=1;"
+      vertex="1" parent="lane_proc">
+      <mxGeometry x="240" y="35" width="120" height="30" as="geometry" />
+    </mxCell>
+
+    <!-- ── Decision diamond in Approver lane (column 2 → x=480) ── -->
+    <mxCell id="n_dec1" value="Approved?"
+      style="rhombus;whiteSpace=wrap;overflow=hidden;html=1;fillColor=#e8e8e8;strokeColor=#808080;fontSize=11;"
+      vertex="1" parent="lane_appr">
+      <mxGeometry x="480" y="35" width="140" height="70" as="geometry" />
+    </mxCell>
+
+    <!--
+      EDGES — MUST have parent="1". Use edgeStyle=orthogonalEdgeStyle on ALL edges.
+      ALWAYS include explicit exitX/exitY/entryX/entryY to prevent criss-crossing:
+        Same-lane horizontal : exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0
+        Cross-lane downward  : exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0
+        Cross-lane upward    : exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0
+        Decision "No" back   : exitX=0;exitY=0.5 with mxPoint waypoints looping below
+        Decision "Yes" fwd   : exitX=1;exitY=0.5 → entryX=0;entryY=0.5
+      All edges: strokeColor=#555555;strokeWidth=1.5;rounded=1
+    -->
+    <mxCell id="e1" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;rounded=1;strokeWidth=1.5;strokeColor=#555555;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;"
+      edge="1" source="n_start" target="n1" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <mxCell id="e2" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;rounded=1;strokeWidth=1.5;strokeColor=#555555;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;"
+      edge="1" source="n1" target="n_dec1" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+  </root>
+</mxGraphModel>`;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  GEMINI SYSTEM PROMPTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── Prompt 1: Draw.io XML (existing canvas view) ──────────────────────────────
+function buildSystemPrompt(processTitle, flowTypeStr, detailLevel) {
+  return `You are an expert business-process architect and Draw.io XML generator.
+Your ONLY job is to output valid Draw.io mxGraphModel XML — nothing else, zero prose, no markdown fences, no explanation.
+
+═══════════════════════ ABSOLUTE COLOR LAW ═══════════════════════
+USE ONLY THESE EXACT fillColor VALUES — NO EXCEPTIONS, NO OTHER COLORS:
+  • Container title bar  : fillColor=#595959   fontColor=#ffffff   strokeColor=#404040   ← use plain swimlane style, NO shape=pool
+  • Lane header strip (Tools/Roles, Manual/Automated) : fillColor=#bfbfbf   fontColor=#000000   strokeColor=#808080
+  • Requestor lane       : fillColor=#ffffff   strokeColor=#999999   fontColor=#000000   ← WHITE background
+  • Approver lane        : fillColor=#ffffff   strokeColor=#999999   fontColor=#000000   ← WHITE background
+  • Any extra process lanes : fillColor=#ffffff   strokeColor=#999999   fontColor=#000000   ← WHITE background
+  • Start / End ellipse  : fillColor=#d9d9d9   strokeColor=#808080   fontColor=#000000
+  • Every process step   : fillColor=#ffffff   strokeColor=#808080   fontColor=#000000
+  • Every decision diamond: fillColor=#e8e8e8  strokeColor=#808080   fontColor=#000000
+  • Tool label box       : fillColor=#f0f0f0   strokeColor=#aaaaaa   fontColor=#333333
+  • MANUAL badge         : fillColor=#e8e8e8   strokeColor=#808080   fontColor=#000000   fontStyle=1
+  • AUTOMATED badge      : fillColor=#d0d0d0   strokeColor=#808080   fontColor=#000000   fontStyle=1
+  • All edges            : strokeColor=#555555
+DO NOT use any green, yellow, blue, purple, red, orange, or any color not listed above.
+DO NOT add shadow=1 to any element.
+═══════════════════════════════════════════════════════════════════
+
+STRICT STRUCTURAL RULES:
+1. Output ONLY raw XML starting with <mxGraphModel and ending with </mxGraphModel>.
+
+2. 4 lanes (rows, top-to-bottom), in this order:
+   • "Tools / Roles"       height=100  — tool/system/role used at each step
+   • "Requestor"           height=130  — person/team making the request
+   • "Approver"            height=130  — the reviewer/approver
+   • "Manual / Automated"  height=100  — MANUAL or AUTOMATED badge per step
+
+3. COLUMN GRID — all nodes and labels align strictly to columns:
+   • Column 0 (Start/End ellipses): x=40
+   • Column 1 (first process step): x=200
+   • Column N (step N, N≥1): x = 200 + ((N−1) × 280)   ← 280px spacing
+     Examples: col1=200, col2=480, col3=760, col4=1040, col5=1320, col6=1600
+   • Every node in every lane at the same column uses the EXACT same x value.
+
+4. NODE GEOMETRY (x/y relative to the lane, NOT the container):
+   • Requestor / Approver lane (height=140):
+       Process step  : width=200  height=50  → y=45   (centres vertically)
+       Decision      : width=140  height=70  → y=35   (centres vertically)
+       Start/End     : width=90   height=42  → y=49
+   • Tools / Roles lane (height=100):
+       Tool label    : width=200  height=34  → y=33
+   • Manual / Automated lane (height=100):
+       Badge         : width=120  height=30  → y=35
+   • Badge x to centre under a 200px node: x_badge = x_step + 40.
+   ALL nodes MUST include overflow=hidden in their style to keep text inside the box.
+
+5. EDGE RULES — prevent ALL criss-crossing:
+   a) parent MUST be "1" (the root) for EVERY edge.
+   b) ALWAYS include exitX, exitY, exitDx=0, exitDy=0, entryX, entryY, entryDx=0, entryDy=0 on every edge.
+   c) Horizontal same-lane: exitX=1;exitY=0.5 → entryX=0;entryY=0.5
+   d) Downward cross-lane (e.g. Requestor → Approver): exitX=0.5;exitY=1 → entryX=0.5;entryY=0
+   e) Upward cross-lane (e.g. Approver → Requestor): exitX=0.5;exitY=0 → entryX=0.5;entryY=1
+   f) Decision "Yes" forward: exitX=1;exitY=0.5 → entryX=0;entryY=0.5
+   g) Decision "No" loop-back: exitX=0;exitY=0.5 with an Array of mxPoint waypoints that route
+      the arrow BELOW the container (y=560) so it never cuts through other nodes.
+      Example waypoints: <Array as="points"><mxPoint x="[exitNodeAbsX]" y="570"/><mxPoint x="[entryNodeAbsX]" y="570"/></Array>
+   h) When two edges share an entry point, stagger them: use entryX=0.3 for one, entryX=0.7 for the other.
+   i) All edge style: edgeStyle=orthogonalEdgeStyle;html=1;rounded=1;strokeWidth=1.5;strokeColor=#555555
+
+6. SHAPE RULES — overflow=hidden is MANDATORY on every node to prevent text overflow:
+   • Start ellipse  : ellipse;whiteSpace=wrap;overflow=hidden;html=1;fillColor=#d9d9d9;strokeColor=#808080;fontSize=11;fontStyle=1
+   • End ellipse    : ellipse;whiteSpace=wrap;overflow=hidden;html=1;fillColor=#d9d9d9;strokeColor=#808080;fontSize=11;fontStyle=1
+   • Process step   : rounded=1;arcSize=40;whiteSpace=wrap;overflow=hidden;html=1;fillColor=#ffffff;strokeColor=#808080;fontSize=11
+   • Decision       : rhombus;whiteSpace=wrap;overflow=hidden;html=1;fillColor=#e8e8e8;strokeColor=#808080;fontSize=11
+   • Tool label     : rounded=1;arcSize=20;whiteSpace=wrap;overflow=hidden;html=1;fillColor=#f0f0f0;strokeColor=#aaaaaa;fontSize=10;fontColor=#333333
+   • MANUAL badge   : rounded=1;arcSize=20;whiteSpace=wrap;overflow=hidden;html=1;fillColor=#e8e8e8;strokeColor=#808080;fontSize=10;fontStyle=1
+   • AUTOMATED badge: rounded=1;arcSize=20;whiteSpace=wrap;overflow=hidden;html=1;fillColor=#d0d0d0;strokeColor=#808080;fontSize=10;fontStyle=1
+
+7. Decision edges MUST include value="Yes" or value="No" (or appropriate label).
+
+8. EVERY process/decision node in Requestor or Approver lane MUST have:
+   • A matching tool label in lane_tools at the SAME x coordinate.
+   • A matching MANUAL or AUTOMATED badge in lane_proc at x = step_x + 25.
+
+9. IDs: n_start, n1, n2 … n_end  |  t1, t2…  |  p1, p2…  |  e1, e2…
+
+10. CONTAINER & LANE SIZING — compute EXACTLY before writing any geometry:
+    • Count N = total number of step columns (not counting the Start/End ellipses).
+    • Container width = 200 + (N × 280) + 200   (200px left pad, 200px right pad). Minimum 900.
+      All lanes MUST share this EXACT same width number.
+    • Lane heights: Tools/Roles=100, each process swimlane=140, Manual/Automated=100.
+    • Container height = 35 + 100 + (num_process_lanes × 140) + 100 + 20.
+      Example 2 process lanes: 35+100+280+100+20 = 535.
+    • CRITICAL: container style = "swimlane;" — NEVER "shape=pool;"
+    • Process lane fillColor=#ffffff (white body), header-strip grey is set by startSize=30 + horizontal=0.
+    • Verification — last column's rightmost edge: (200+(N-1)×280)+200 must be ≤ containerWidth−30.
+      If not, increase containerWidth until it satisfies this constraint.
+
+11. Container value = "${processTitle} (${flowTypeStr})"
+
+12. Detail level: ${detailLevel === 'summary' ? '3–5 steps' : detailLevel === 'detailed' ? '9–15 steps' : '5–8 steps'}.
+
+TEMPLATE TO FOLLOW (extend it with real nodes based on the user's process):
+${XML_TEMPLATE}
+
+Now generate the complete XML for the described process. Remember: output ONLY the raw XML, starting with <mxGraphModel.`;
+}
+
+// ── Prompt 2: Enterprise Flow JSON spec (for xlsx export) ─────────────────────
+function buildEnterpriseFlowPrompt(processTitle, flowTypeStr, detailLevel) {
+  const stepCount = detailLevel === 'summary' ? '3–5' : detailLevel === 'detailed' ? '9–20' : '5–10';
+  return `You are an expert enterprise process architect. Analyse the described workflow and output a JSON specification for a spatial enterprise flow diagram — exactly like a professional Visio/Excel process map.
+
+OUTPUT FORMAT: Return ONLY a single valid JSON object. No prose, no markdown fences, no explanation.
+
+The JSON must have this exact structure:
+{
+  "title": "${processTitle}",
+  "flow_type": "${flowTypeStr}",
+  "tools": ["ToolA", "ToolB", ...],
+  "actors": ["Actor1", "Actor2", "Actor3"],
+  "nodes": [
+    {
+      "id": "n_start",
+      "type": "start",
+      "text": "Start",
+      "tool": "ToolA",
+      "actor": "Actor1",
+      "col": 0
+    },
+    ...
+  ],
+  "edges": [
+    { "from": "n_start", "to": "n1", "label": "" },
+    { "from": "n_dec1",  "to": "n2", "label": "Yes" },
+    { "from": "n_dec1",  "to": "n3", "label": "No" },
+    ...
+  ]
+}
+
+FIELD RULES:
+1. "tools" — list every distinct system, application, or tool involved (e.g. "ServiceNow", "Outlook", "Windows Server"). These become the VERTICAL axis (row groups). Order them chronologically — the first tool used appears first.
+
+2. "actors" — list the distinct human roles or execution types (e.g. "Requestor", "Approver", "Manual Process"). These become the HORIZONTAL axis (column groups). Maximum 4 actors.
+
+3. nodes[].type — MUST be exactly one of: "start", "end", "process", "decision"
+   • "start" and "end" — one each, mandatory
+   • "process" — action steps, text starts with a verb
+   • "decision" — questions/checks, text ends with "?"
+
+4. nodes[].tool — MUST exactly match one of the strings in "tools"
+
+5. nodes[].actor — MUST exactly match one of the strings in "actors"
+
+6. nodes[].col — INTEGER, 0-based chronological column. The "start" node is col=0. Each subsequent step increments col. Parallel steps on the SAME column share the same col number. Use the diagonal-waterfall rule: sequential steps get increasing col values.
+
+7. edges[] — EVERY node except "end" must have at least one outgoing edge. EVERY node except "start" must have at least one incoming edge.
+
+8. DECISION NODES ARE CRITICAL:
+   • Every decision node MUST have EXACTLY 2 outgoing edges: one labelled "Yes" and one labelled "No"
+   • "Yes" edge goes FORWARD (to the next logical step, higher col number)
+   • "No" edge MUST go to a meaningful target — either loop back to a previous step OR go to a new remediation/escalation step. NEVER leave a "No" path dangling.
+   • If the process description implies a decision but doesn't specify the "No" path, INFER it intelligently based on the process domain (e.g. "Contact support team", "Retry installation", "Escalate to admin", "Notify requestor of rejection").
+
+9. Detail level: ${stepCount} process/decision steps total (not counting start/end).
+
+10. The flow must be logically complete — someone should be able to execute the actual process by following only the nodes and edges you output.
+
+EXAMPLE of a valid decision with inferred No-path:
+If the process says "Check if server is configured" but only mentions the Yes path,
+you must add a remediation node like:
+  { "id": "n_fix1", "type": "process", "text": "Contact Windows team to configure server", "tool": "Outlook", "actor": "Manual Process", "col": 2 }
+  { "from": "n_dec1", "to": "n_fix1", "label": "No" }
+  { "from": "n_fix1", "to": "n_dec1", "label": "" }   ← loop back after fix
+
+Now output the JSON spec for: "${processTitle} (${flowTypeStr})"`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  GEMINI API CALL
+// ═══════════════════════════════════════════════════════════════════════════════
+async function callGemini(apiKey, model, systemPrompt, userPrompt, imgBase64, imgMime) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  const parts = [];
+  parts.push({ text: systemPrompt + '\n\n--- USER REQUEST ---\n' + userPrompt });
+  if (imgBase64) {
+    parts.push({ inline_data: { mime_type: imgMime, data: imgBase64 } });
+  }
+
+  const body = {
+    contents: [{ role: 'user', parts }],
+    generationConfig: {
+      temperature:     0.15,
+      maxOutputTokens: 16384,
+      topP:            0.85,
+    },
+    safetySettings: [
+      { category: 'HARM_CATEGORY_HARASSMENT',        threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_HATE_SPEECH',       threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+    ],
+  };
+
+  const resp = await fetch(url, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(body),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `HTTP ${resp.status}`);
+  }
+
+  const data = await resp.json();
+  const raw  = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  return raw.trim();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  XML EXTRACTION & VALIDATION
+// ═══════════════════════════════════════════════════════════════════════════════
+function extractXml(raw) {
+  let clean = raw.replace(/```xml\s*/gi, '').replace(/```\s*/g, '').trim();
+  const start = clean.indexOf('<mxGraphModel');
+  const end   = clean.lastIndexOf('</mxGraphModel>');
+  if (start === -1 || end === -1) return null;
+  return clean.slice(start, end + '</mxGraphModel>'.length);
+}
+
+function validateXml(xml) {
+  try {
+    const parser = new DOMParser();
+    const doc    = parser.parseFromString(xml, 'text/xml');
+    return !doc.querySelector('parsererror');
+  } catch { return false; }
+}
+
+function extractJson(raw) {
+  // Strip markdown fences if present
+  let clean = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+  // Find first { to last }
+  const start = clean.indexOf('{');
+  const end   = clean.lastIndexOf('}');
+  if (start === -1 || end === -1) return null;
+  try {
+    return JSON.parse(clean.slice(start, end + 1));
+  } catch(e) {
+    console.warn('[ModhaFlow] JSON parse failed:', e.message);
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  PUSH TO DRAW.IO
+// ═══════════════════════════════════════════════════════════════════════════════
+function pushDiagram(xml) {
+  document.getElementById('placeholder').style.display     = 'none';
+  document.getElementById('diagram-frame').style.display   = 'block';
+
+  if (drawIoReady) {
+    sendXmlToDrawio(xml);
+  } else {
+    pendingXml = xml;
+    frame.src = frame.src;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  MAIN GENERATE FUNCTION — dual output: Draw.io canvas + enterprise flow spec
+// ═══════════════════════════════════════════════════════════════════════════════
+async function generateDiagram() {
+  const apiKey  = document.getElementById('api-key').value.trim()
+                  || localStorage.getItem('mf_gemini_key') || '';
+  const prompt  = document.getElementById('prompt-input').value.trim();
+  const title   = document.getElementById('process-title').value.trim() || 'Workflow Process';
+  const model   = document.getElementById('model-select').value;
+  const detail  = document.getElementById('detail-level').value;
+
+  if (!apiKey) {
+    setStatus('error', '✕ Add your Gemini API key in ⚙ Settings first.');
+    return;
+  }
+  if (!prompt && !imageBase64) {
+    setStatus('warning', '⚠ Provide a text prompt or upload an image (or both).');
+    return;
+  }
+
+  document.getElementById('generate-btn').disabled = true;
+  document.getElementById('steps-tracker').style.display = 'flex';
+  document.getElementById('model-badge').textContent = 'Model: ' + model;
+  document.getElementById('export-flow-btn').disabled = true;
+  resetSteps();
+  stepActive(1);
+  setStatus('info', 'Sending request to Gemini…', true);
+
+  const userMsg = prompt || 'Analyse the uploaded sketch and generate the swimlane process diagram.';
+
+  try {
+    // ── Step 1: Generate Draw.io XML (canvas view) ────────────────────────
+    const sysPrompt  = buildSystemPrompt(title, flowType, detail);
+    const rawXml     = await callGemini(apiKey, model, sysPrompt, userMsg, imageBase64, imageMimeType);
+    stepDone(1); stepActive(2);
+    setStatus('info', 'Parsing and validating XML…', true);
+
+    const xml = extractXml(rawXml);
+    if (!xml) throw new Error('Gemini did not return valid Draw.io XML. Try rephrasing your prompt or using Gemini 2.5 Pro.');
+    if (!validateXml(xml)) throw new Error('XML structure is malformed. Open "View XML" to inspect and fix manually.');
+
+    currentXml = xml;
+    document.getElementById('xml-editor').value = xml;
+    const fixedXml = fixContainerSize(xml);
+    currentXml = fixedXml;
+    document.getElementById('xml-editor').value = fixedXml;
+
+    // ── Step 2: Push to Draw.io ───────────────────────────────────────────
+    setStatus('info', 'Pushing diagram to Draw.io…', true);
+    pushDiagram(fixedXml);
+
+    // ── Step 3: In parallel, generate enterprise flow JSON spec ──────────
+    // (non-blocking — don't hold up the canvas render)
+    currentFlowSpec = null;
+    document.getElementById('export-flow-btn').disabled = true;
+    document.getElementById('export-flow-btn').textContent = '⏳ Building flow spec…';
+
+    const flowPrompt = buildEnterpriseFlowPrompt(title, flowType, detail);
+    callGemini(apiKey, model, flowPrompt, userMsg, imageBase64, imageMimeType)
+      .then(rawJson => {
+        const spec = extractJson(rawJson);
+        if (spec && spec.nodes && spec.edges) {
+          // Validate: ensure every decision has both Yes and No edges
+          spec.nodes.forEach(node => {
+            if (node.type !== 'decision') return;
+            const outEdges = spec.edges.filter(e => e.from === node.id);
+            const hasYes   = outEdges.some(e => /yes/i.test(e.label));
+            const hasNo    = outEdges.some(e => /no/i.test(e.label));
+            if (!hasYes) {
+              const nextCol = (node.col || 0) + 1;
+              const fwdNode = spec.nodes.find(n => n.col === nextCol);
+              if (fwdNode) spec.edges.push({ from: node.id, to: fwdNode.id, label: 'Yes' });
+            }
+            if (!hasNo) {
+              // Add an inferred remediation node
+              const remId  = node.id + '_no';
+              const remCol = (node.col || 0);
+              spec.nodes.push({
+                id: remId, type: 'process',
+                text: 'Escalate / Remediate Issue',
+                tool: node.tool, actor: 'Manual Process', col: remCol
+              });
+              spec.edges.push({ from: node.id, to: remId,    label: 'No' });
+              spec.edges.push({ from: remId,   to: node.id,  label: '' });
+            }
+          });
+          currentFlowSpec = spec;
+          document.getElementById('export-flow-btn').disabled = false;
+          document.getElementById('export-flow-btn').textContent = '📊 Export as Enterprise Flow (.xlsx)';
+        } else {
+          console.warn('[ModhaFlow] Enterprise spec JSON invalid — xlsx export unavailable');
+          document.getElementById('export-flow-btn').textContent = '📊 Export as Enterprise Flow (.xlsx)';
+          document.getElementById('export-flow-btn').disabled = false;
+        }
+      })
+      .catch(err => {
+        console.warn('[ModhaFlow] Enterprise spec generation failed:', err.message);
+        document.getElementById('export-flow-btn').textContent = '📊 Export as Enterprise Flow (.xlsx)';
+        document.getElementById('export-flow-btn').disabled = false;
+      });
+
+  } catch (err) {
+    setStatus('error', '✕ ' + err.message);
+    document.getElementById('generate-btn').disabled = false;
+    document.getElementById('export-flow-btn').disabled = false;
+    document.getElementById('export-flow-btn').textContent = '📊 Export as Enterprise Flow (.xlsx)';
+    resetSteps();
+    console.error('[ModhaFlow Error]', err);
+  }
+}
+
+// ── Handle Enter key in prompt box ────────────────────────────────────────────
+document.getElementById('prompt-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.ctrlKey) generateDiagram();
+});
+
+// ── On load: restore saved API keys from localStorage ─────────────────────────
+loadSavedKeys();
+</script>
+</body>
+</html>
