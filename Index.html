@@ -858,15 +858,9 @@ function exportEnterpriseFlowExcel() {
   setStatus('info', 'Building enterprise flow Excel — this takes a few seconds…', true);
 
   if (typeof google === 'undefined' || !google.script) {
-    // Fallback: download spec as JSON for local testing
-    const blob = new Blob([JSON.stringify(currentFlowSpec, null, 2)], { type: 'application/json' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url; a.download = 'flow_spec.json'; a.click();
-    URL.revokeObjectURL(url);
     btn.disabled = false;
     btn.textContent = '📊 Export as Enterprise Flow (.xlsx)';
-    setStatus('info', '(local mode) Flow spec downloaded as JSON. Deploy as web app for real .xlsx.');
+    setStatus('warning', '⚠ Excel export requires the app to be deployed as a Google Apps Script web app. Please deploy and re-open from the published URL.');
     return;
   }
 
